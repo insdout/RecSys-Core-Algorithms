@@ -1,11 +1,35 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from src.dssm.layers import FeatureEmbeddings, MLP, Feature
+from typing import List, Dict, Union
 
 
 class DSSMModel(nn.Module):
-    def __init__(self, user_features, item_features, mlp_user_params, mlp_item_params, temperature):
+    """
+    Deep Structured Semantic Model (DSSM) for recommendation.
+
+    Attributes:
+        user_features (List[Feature]): List of Feature objects representing user features.
+        item_features (List[Feature]): List of Feature objects representing item features.
+        temperature (float): Temperature parameter for similarity computation.
+        feature_embeddings (FeatureEmbeddings): Embedding layer for user and item features.
+        user_tower (MLP): Multilayer Perceptron (MLP) for user features.
+        item_tower (MLP): Multilayer Perceptron (MLP) for item features.
+
+    Methods:
+        forward(x: Dict[str, torch.Tensor]) -> torch.Tensor:
+            Forward method to compute the output of the DSSM model.
+
+    """
+
+    def __init__(
+        self,
+        user_features: List[Feature],
+        item_features: List[Feature],
+        mlp_user_params: Dict[str, Union[List[int], float]],
+        mlp_item_params: Dict[str, Union[List[int], float]],
+        temperature: float,
+    ):
         super(DSSMModel, self).__init__()
         self.user_features = user_features
         self.item_features = item_features
@@ -14,22 +38,42 @@ class DSSMModel(nn.Module):
 
         user_emb_dims = self._calculate_input_dims(self.user_features)
         item_emb_dims = self._calculate_input_dims(self.item_features)
-        self.user_tower = MLP(user_emb_dims, mlp_user_params)
-        self.item_tower = MLP(item_emb_dims, mlp_item_params)
+        self.user_tower = MLP(input_dim=user_emb_dims, output_layer=True, **mlp_user_params)
+        self.item_tower = MLP(input_dim=item_emb_dims, output_layer=True, **mlp_item_params)
 
-    def _calculate_input_dims(self, features):
+    def _calculate_input_dims(self, features: List[Feature]) -> int:
+        """
+        Calculate the total input dimension for the specified features.
+
+        Args:
+            features (List[Feature]): List of Feature objects.
+
+        Returns:
+            int: Total input dimension.
+
+        """
         return sum([feature.embedding_dim for feature in features])
-    
-    def forward(self, x):
+
+    def forward(self, x: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """
+        Forward method to compute the output of the DSSM model.
+
+        Args:
+            x (Dict[str, torch.Tensor]): Input data dictionary.
+
+        Returns:
+            torch.Tensor: Model output.
+
+        """
         user_emb = self.feature_embeddings(x, self.user_features)
         item_emb = self.feature_embeddings(x, self.item_features)
 
         user_vec = self.user_tower(user_emb)
         item_vec = self.item_tower(item_emb)
+
         # Perform similarity computation (cosine similarity)
-        
         y = (user_vec * item_vec).sum(dim=1) / self.temperature
-        
+
         return torch.sigmoid(y)
 
 
@@ -45,18 +89,19 @@ if __name__ == '__main__':
     movie_id_feature = Feature(name='movie_id', vocab_dim=3000, embedding_dim=32, sequential=False, padding=None)
     hist_movie_id_feature = Feature(name='hist_movie_id', vocab_dim=1000, embedding_dim=32, sequential=True, padding=0, shared_embedding='movie_id')
 
- 
     # Define MLP dimensions
     mlp_dims = [64, 32]
 
     temperature = 1.0
 
     # Create DSSMModel instance
-    model = DSSMModel(user_features=[gender_feature, age_feature, occupation_feature, zip_feature],
-                      item_features=[movie_id_feature, hist_movie_id_feature],
-                      mlp_user_params={'dims': mlp_dims},
-                      mlp_item_params={'dims': mlp_dims},
-                      temperature=temperature)
+    model = DSSMModel(
+        user_features=[gender_feature, age_feature, occupation_feature, zip_feature],
+        item_features=[movie_id_feature, hist_movie_id_feature],
+        mlp_user_params={'dims': mlp_dims},
+        mlp_item_params={'dims': mlp_dims},
+        temperature=temperature
+    )
 
     # Example input data
     data = {'user_id': torch.tensor([34, 17, 44]),
