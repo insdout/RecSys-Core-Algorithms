@@ -144,6 +144,7 @@ class Feature(object):
         self.padding = padding
         self.pooling_type = pooling_type
         self.shared_embedding = shared_embedding
+        self.emb = None
 
     def get_emb(self) -> nn.Embedding:
         """
@@ -153,7 +154,9 @@ class Feature(object):
             nn.Embedding: Embedding layer for the feature.
 
         """
-        return nn.Embedding(self.vocab_dim, self.embedding_dim, padding_idx=self.padding)
+        if not self.emb:
+            self.emb = nn.Embedding(self.vocab_dim, self.embedding_dim, padding_idx=self.padding)
+        return self.emb
 
 
 class FeatureEmbeddings(nn.Module):
@@ -231,7 +234,7 @@ class MLP(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        output_layer: bool = True,
+        output_layer: bool = False,
         dims: Optional[List[int]] = None,
         dropout: float = 0,
         activation: str = "relu",

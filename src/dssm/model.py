@@ -38,8 +38,8 @@ class DSSMModel(nn.Module):
 
         user_emb_dims = self._calculate_input_dims(self.user_features)
         item_emb_dims = self._calculate_input_dims(self.item_features)
-        self.user_tower = MLP(input_dim=user_emb_dims, output_layer=True, **mlp_user_params)
-        self.item_tower = MLP(input_dim=item_emb_dims, output_layer=True, **mlp_item_params)
+        self.user_tower = MLP(input_dim=user_emb_dims, output_layer=False, **mlp_user_params)
+        self.item_tower = MLP(input_dim=item_emb_dims, output_layer=False, **mlp_item_params)
 
     def _calculate_input_dims(self, features: List[Feature]) -> int:
         """
@@ -71,8 +71,9 @@ class DSSMModel(nn.Module):
         user_vec = self.user_tower(user_emb)
         item_vec = self.item_tower(item_emb)
 
+        
         # Perform similarity computation (cosine similarity)
-        y = (user_vec * item_vec).sum(dim=1) / self.temperature
+        y = torch.sum(user_vec * item_vec, dim=1) / self.temperature
 
         return torch.sigmoid(y)
 
